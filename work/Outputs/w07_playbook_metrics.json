@@ -1,0 +1,37 @@
+{
+  "rows_ranked": 30000,
+  "action_counts": {
+    "HOLD": 17971,
+    "REVIEW_TITLE_SNIPPET": 9759,
+    "MONITOR": 2264,
+    "REVIEW_REFRESH": 6
+  },
+  "reason_counts": {
+    "INSUFFICIENT_SIGNAL": 17971,
+    "LOW_CTR_VISIBLE": 9759,
+    "VISIBLE_MONITOR": 2264,
+    "STALE_HIGH_VOLUME": 6
+  },
+  "top20_observed_decline_proxy_share_retrospective_only": 0.55,
+  "top50_observed_decline_proxy_share_retrospective_only": 0.58,
+  "week6_validation_note": "Grouped-client validation showed limited overall discrimination; playbook is exploratory human-reviewed decision-support.",
+  "monitoring": {
+    "lane": "Refresh / Content Opportunity Scoring",
+    "intended_use": "Human-reviewed prioritization only",
+    "primary_metric": "Precision@20",
+    "retrain_or_redesign_triggers": {
+      "p20_below_week4_baseline": true,
+      "auroc_near_chance": 0.52,
+      "feature_median_shift_fraction": 0.25,
+      "missingness_change_percentage_points": 10,
+      "editor_top20_rejection_rate": 0.5,
+      "rejection_cycles": 2
+    },
+    "no_go_automation": [
+      "auto-publish",
+      "auto-delete/noindex/redirect",
+      "automatic causal claims",
+      "automatic metadata changes"
+    ]
+  }
+}
