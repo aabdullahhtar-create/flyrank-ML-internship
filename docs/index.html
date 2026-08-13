@@ -1,18 +1,210 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Can ML Prioritize Content Refresh Reviews?</title>
-<style>:root{--bg:#f7f8fa;--paper:#fff;--ink:#172033;--muted:#5f6b7a;--line:#dfe4ea;--accent:#2457d6;--soft:#eef3ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.68 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:920px;margin:auto;background:var(--paper);padding:64px 72px;box-shadow:0 0 0 1px var(--line)}h1{font-size:2.55rem;line-height:1.08}h2{font-size:1.55rem;margin-top:2.4em;border-top:1px solid var(--line);padding-top:1em}.kicker{color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem}.lead{font-size:1.13rem;color:#344054}.meta,.caption,.note{color:var(--muted);font-size:.92rem}.abstract,.callout{background:var(--soft);padding:20px 24px;border-left:4px solid var(--accent);border-radius:4px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}.stat{border:1px solid var(--line);padding:16px;border-radius:8px}.stat b{font-size:1.45rem;display:block}table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}figure{margin:32px 0}img{max-width:100%;border:1px solid var(--line);border-radius:6px}code{background:#f2f4f7;padding:2px 5px;border-radius:4px}a{color:var(--accent)}footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--line)}@media(max-width:700px){main{padding:34px 20px}h1{font-size:2rem}.grid{grid-template-columns:1fr}table{font-size:.78rem}}</style></head><body><main>
-<div class="kicker">FlyRank ML Internship · Capstone Research</div><h1>Can ML Prioritize Content Refresh Reviews?</h1><p class="lead">A cautious study of content-opportunity scoring, grouped validation, and human-reviewed actions.</p>
-<section class="abstract"><h2 style="border:0;margin:0">Abstract</h2><p>FlyRank's content-review problem is a prioritization problem: content teams have more pages than editors can inspect one by one. This study asks whether measured search and content signals can help prioritize pages for human refresh review. It uses the 30,000-row pseudonymized FlyRank starter release for modeling and draws the broader data context from the approximately 79 million-row internship warehouse, while excluding client-identifying information and label-derived fields from model inputs. A transparent Week-4 rule was compared on the same client-grouped holdout with Logistic Regression and Random Forest using five measured features. Logistic Regression reached 75% Precision@20 but only 0.501 AUROC, while Random Forest reached 0.625 AUROC and 0.617 average precision, showing that a strong small top-k result does not by itself establish reliable generalization. The resulting artifact is therefore a human-reviewed decision-support playbook for prioritizing inspection, not an automated editing system or evidence that refreshing a page causes recovery.</p></section>
-<h2>1. Introduction / Problem statement</h2><p>FlyRank's real content workflow creates a capacity problem: content teams cannot inspect every page with equal attention. This study asks which pseudonymized content items should be reviewed first when analyst capacity is limited. The output is a ranked review score; the action remains a human inspection. False positives waste editorial time and can create unnecessary churn, while false negatives leave potential opportunities unreviewed.</p>
-<h2>2. Data</h2><div class="grid"><div class="stat"><b>30,000</b>starter rows</div><div class="stat"><b>32</b>pseudonymized clients</div><div class="stat"><b>≈79M</b>warehouse daily rows</div></div><p>Modeling uses the starter release with trailing-90-day measurements. The broader warehouse contains 78,835,655 daily performance rows spanning 2025-01-27 to 2026-06-30. Earlier data-contract work used a mid-panel March 2026 window and treated the final month as sealed when developing warehouse label logic.</p><p>Features are impressions, clicks, CTR, average position, and days since last update. <code>trend_direction</code>, <code>trend_pct</code>, the derived decline proxy, IDs as predictors, private queries, client names, and URLs are excluded.</p>
-<h2>3. Methodology</h2><p>The retrospective proxy is <code>trend_direction == "down"</code>. It describes an observed trend, not a causal treatment label. The transparent baseline combines visible position, meaningful impressions, and a low-CTR gap. Logistic Regression is the readable first model; Random Forest is a nonlinear challenger.</p><p>Validation holds out entire clients using <code>GroupShuffleSplit(test_size=0.25, random_state=42)</code>: 24 clients / 22,885 pages train and 8 clients / 7,115 pages test, with zero client overlap. Label-derived fields and pseudonymous IDs are excluded from features.</p>
-<h2>4. Results</h2><p>The grouped test base rate was 51.7%. All methods use the same held-out clients.</p><table><thead><tr><th>Method</th><th>P@20</th><th>P@50</th><th>AUROC</th><th>Avg. precision</th></tr></thead><tbody><tr><td>Base rate</td><td>51.7%</td><td>51.7%</td><td>0.500</td><td>0.517</td></tr><tr><td>Week-4 baseline</td><td>50.0%</td><td>58.0%</td><td>0.500</td><td>0.513</td></tr><tr><td>Logistic Regression</td><td>75.0%</td><td>62.0%</td><td>0.501</td><td>0.525</td></tr><tr><td>Random Forest</td><td>60.0%</td><td>72.0%</td><td>0.625</td><td>0.617</td></tr></tbody></table>
-<figure><img src="assets/model_vs_baseline.png"><figcaption class="caption">Logistic Regression led Precision@20, but this is only twenty held-out cases.</figcaption></figure><figure><img src="assets/auroc_comparison.png"><figcaption class="caption">Random Forest showed stronger overall discrimination; Logistic Regression was near chance by AUROC.</figcaption></figure>
-<div class="callout"><b>Interpretation:</b> results are mixed. The small top-k queue looks promising, but broader discrimination does not support a production-reliability claim.</div>
-<h2>5. Limitations & honest framing</h2><ul><li>The starter data is a trailing-90-day snapshot, not an intervention study.</li><li>The proxy can reflect seasonality, SERP changes, intent, or omitted context.</li><li>CTR depends on ranking and SERP layout; staleness does not equal poor quality.</li><li>Precision@20 is capacity-aligned but based on only twenty cases.</li><li>Grouped validation is more realistic for unseen clients but is not a future time split.</li><li>No result proves that refreshing, rewriting, pruning, or changing metadata causes recovery.</li></ul>
-<h2>6. Ranked recommendations</h2><p>The Week-7 playbook produced 9,759 <code>REVIEW_TITLE_SNIPPET</code>, 6 <code>REVIEW_REFRESH</code>, 2,264 <code>MONITOR</code>, and 17,971 <code>HOLD</code> rows. A human should check intent, SERP context, factual freshness, cannibalization, business importance, recent changes, and measurement sufficiency before action.</p>
-<figure><img src="assets/w07_action_mix.png"><figcaption class="caption">Most pages are held rather than forced into an intervention.</figcaption></figure><figure><img src="assets/w07_staleness_by_action.png"><figcaption class="caption">Staleness is a review trigger, not proof of decay.</figcaption></figure>
-<p><b>No-go automation:</b> do not automatically publish, rewrite, delete, noindex, redirect, canonicalize, merge pages, alter production metadata/schema, or promise traffic improvement.</p>
-<h2>7. Reproducibility</h2><p>Random seed is fixed at 42 where applicable. The repository contains the starter data, requirements, and executed notebooks.</p><ul><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship">Public repository</a></li><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w04_baseline_score.ipynb">Baseline notebook</a></li><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w05_model.ipynb">Model notebook</a></li><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w06_validation_audit.ipynb">Validation audit</a></li><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w07_action_playbook.ipynb">Action playbook</a></li><li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/capstone.ipynb">Capstone notebook</a></li></ul>
-<footer><h2 style="border:0;margin:0">8. Acknowledgments & data credit</h2><p><b>Built on the <a href="https://flyrank.ai/">FlyRank ML Internship dataset</a>.</b> Thanks to FlyRank for the pseudonymized internship data and learning framework.</p><p class="meta">Internship research artifact; not a production recommendation system.</p></footer>
-</main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A public-safe FlyRank research paper on ranking pages for human content-refresh review.">
+  <title>Can ML Prioritize Content Refresh Reviews?</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --line: #dfe4ea;
+      --accent: #2457d6;
+      --soft: #eef3ff;
+      --success: #12715b;
+      --warning: #9a5b00;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 17px/1.68 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 960px;
+      margin: 32px auto;
+      background: var(--paper);
+      padding: 68px 76px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgb(23 32 51 / 8%);
+    }
+    h1 { margin: 12px 0 18px; font-size: clamp(2.25rem, 6vw, 3.45rem); line-height: 1.03; letter-spacing: -.035em; }
+    h2 { margin-top: 2.6em; padding-top: 1em; border-top: 1px solid var(--line); font-size: 1.58rem; line-height: 1.25; }
+    h3 { margin: 0 0 6px; font-size: 1rem; }
+    p { margin: 0 0 1em; }
+    ul, ol { padding-left: 1.35em; }
+    li + li { margin-top: .55em; }
+    a { color: var(--accent); text-underline-offset: .15em; }
+    code { padding: 2px 5px; background: #f2f4f7; border-radius: 4px; font-size: .9em; }
+    .kicker { color: var(--accent); font-weight: 750; text-transform: uppercase; letter-spacing: .09em; font-size: .79rem; }
+    .lead { max-width: 760px; color: #344054; font-size: 1.17rem; }
+    .meta { color: var(--muted); font-size: .91rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 32px; }
+    .chip { padding: 6px 10px; border: 1px solid #cdd8f5; border-radius: 999px; background: #f8faff; color: #29467e; font-size: .81rem; font-weight: 650; }
+    .abstract, .callout { padding: 22px 25px; border-left: 4px solid var(--accent); border-radius: 6px; background: var(--soft); }
+    .abstract h2 { margin: 0 0 10px; padding: 0; border: 0; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+    .stat { padding: 17px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfe; }
+    .stat b { display: block; margin-bottom: 2px; font-size: 1.42rem; line-height: 1.2; }
+    .stat span { color: var(--muted); font-size: .82rem; }
+    .method-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+    .method-card { padding: 17px; border: 1px solid var(--line); border-radius: 9px; }
+    .method-card p { margin: 0; color: var(--muted); font-size: .89rem; }
+    .table-wrap { overflow-x: auto; margin: 22px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .91rem; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { background: #f8f9fb; font-size: .81rem; text-transform: uppercase; letter-spacing: .03em; }
+    th:first-child, td:first-child { text-align: left; }
+    figure { margin: 34px 0; }
+    img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+    figcaption { margin-top: 9px; color: var(--muted); font-size: .9rem; }
+    .evidence { border-left-color: var(--success); background: #edf8f4; }
+    .caution { border-left-color: var(--warning); background: #fff7e9; }
+    .actions { list-style: none; padding: 0; counter-reset: action; }
+    .actions li { position: relative; padding: 14px 16px 14px 52px; border: 1px solid var(--line); border-radius: 8px; }
+    .actions li::before { counter-increment: action; content: counter(action); position: absolute; left: 16px; top: 14px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; font-size: .78rem; font-weight: 700; }
+    footer { margin-top: 52px; padding-top: 26px; border-top: 1px solid var(--line); }
+    footer h2 { margin: 0 0 12px; padding: 0; border: 0; }
+    @media (max-width: 760px) {
+      main { margin: 0; padding: 38px 21px; border: 0; border-radius: 0; }
+      .grid, .method-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .grid, .method-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="kicker">FlyRank ML Internship · Capstone Research</div>
+    <h1>Can ML Prioritize Content Refresh Reviews?</h1>
+    <p class="lead">A cautious study of content-opportunity scoring, grouped validation, and human-reviewed actions.</p>
+    <div class="chips" aria-label="Research summary">
+      <span class="chip">Lane: Refresh opportunity scoring</span>
+      <span class="chip">Unit: one pseudonymized page</span>
+      <span class="chip">Primary metric: Precision@20</span>
+      <span class="chip">Use: human review only</span>
+    </div>
+  </header>
+
+  <section class="abstract" aria-labelledby="abstract-title">
+    <h2 id="abstract-title">Abstract</h2>
+    <p>This study asks whether measured search and content signals can prioritize which pages a human editor reviews first. It models 30,000 pseudonymized FlyRank starter-release pages and checks the design on a 71,777-page March 2026 frame built from the 78,835,655-row warehouse release. A transparent rule, Logistic Regression, and Random Forest are compared on the same client-grouped starter holdout using five predeclared features, while the warehouse check separates March 1–21 features from a March 22–31 outcome. Logistic Regression reached 75% Precision@20 but 0.501 AUROC, Random Forest reached 0.625 AUROC and 0.617 average precision, and the stricter warehouse check reached 0.590 AUROC. The result is therefore a ranked, human-reviewed decision-support playbook—not evidence that refreshing a page causes recovery.</p>
+  </section>
+
+  <section>
+    <h2>1. Introduction / Problem statement</h2>
+    <p>Content teams have more pages than they can inspect one by one. The practical decision is which pages an editor should review first when time is limited, not whether software should automatically rewrite or remove a page. False positives waste editorial capacity and create unnecessary churn; false negatives leave potentially useful opportunities unreviewed.</p>
+    <p>The output is a priority score, an ordered queue, and a short reason code. A person still checks search intent, page purpose, current facts, business importance, and recent changes before choosing any action.</p>
+  </section>
+
+  <section>
+    <h2>2. Data</h2>
+    <div class="grid">
+      <div class="stat"><b>30,000</b><span>starter pages modeled</span></div>
+      <div class="stat"><b>32</b><span>pseudonymized clients</span></div>
+      <div class="stat"><b>78.8M</b><span>warehouse daily rows</span></div>
+      <div class="stat"><b>71,777</b><span>March forward-label pages</span></div>
+    </div>
+    <p>The primary model uses the real, anonymized 30,000-row × 44-column starter release at one row per pseudonymized content item. Warehouse support uses FlyRank internship-warehouse build <code>v20260703</code>, specifically <code>fact_content_daily_performance</code>, whose 78,835,655 daily rows span 2025-01-27 through 2026-06-30.</p>
+    <p>The warehouse contract develops on the March 2026 partition: 9,841,378 daily rows and 331,437 content items. Features use 2026-03-01 through 2026-03-21; the forward proxy compares 2026-03-22 through 2026-03-31 against the preceding ten days and keeps pages with at least 100 prior-window impressions. June 2026 remains sealed during label development.</p>
+    <p>Excluded from model inputs are <code>trend_direction</code>, <code>trend_pct</code>, the derived decline proxy, all outcome-window measurements, IDs as predictors, client names, domains, URLs, raw queries, and product decision fields. GSC availability is required for warehouse measurements; a zero recorded before tracking begins is not treated as zero activity.</p>
+  </section>
+
+  <section>
+    <h2>3. Methodology</h2>
+    <div class="method-grid">
+      <div class="method-card"><h3>Transparent baseline</h3><p>Ranks visible pages using meaningful impressions, positions 1–20, and a low-CTR gap.</p></div>
+      <div class="method-card"><h3>Readable model</h3><p>Logistic Regression uses impressions, clicks, CTR, average position, and days since update.</p></div>
+      <div class="method-card"><h3>Nonlinear challenger</h3><p>Random Forest tests whether interactions improve ranking beyond the readable model.</p></div>
+    </div>
+    <p>The starter proxy is an observed down-trend bucket; it is a retrospective teaching proxy, not a treatment outcome. All three methods are evaluated on the same <code>GroupShuffleSplit(test_size=0.25, random_state=42)</code>: 24 clients / 22,885 pages for training and 8 previously unseen clients / 7,115 pages for testing, with zero client overlap.</p>
+    <p>The primary metric is Precision@20 because the decision is a capacity-limited review queue. Precision@50, AUROC, average precision, and the held-out base rate are reported beside it. Leakage checks exclude the entire label family and pseudonymous IDs from features; a deliberate warehouse label-copy test reaches AUROC 1.000 and is then deleted, while the honest five-feature check reaches 0.590.</p>
+  </section>
+
+  <section>
+    <h2>4. Results</h2>
+    <p>The grouped starter test base rate is 51.7%. Every value below comes from the same held-out clients.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Precision@20</th><th>Precision@50</th><th>AUROC</th><th>Avg. precision</th></tr></thead>
+        <tbody>
+          <tr><td>Base rate</td><td>51.7%</td><td>51.7%</td><td>0.500</td><td>0.517</td></tr>
+          <tr><td>Week-4 baseline</td><td>50.0%</td><td>58.0%</td><td>0.500</td><td>0.513</td></tr>
+          <tr><td>Logistic Regression</td><td>75.0%</td><td>62.0%</td><td>0.501</td><td>0.525</td></tr>
+          <tr><td>Random Forest</td><td>60.0%</td><td>72.0%</td><td>0.625</td><td>0.617</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure>
+      <img src="assets/model_vs_baseline.png" alt="Bar chart comparing Precision at 20 and Precision at 50 for the base rate, rule baseline, Logistic Regression, and Random Forest.">
+      <figcaption>Logistic Regression led Precision@20, but that result covers only twenty held-out pages; Random Forest led Precision@50.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/auroc_comparison.png" alt="Bar chart comparing AUROC for the base rate, rule baseline, Logistic Regression, and Random Forest.">
+      <figcaption>Random Forest showed better overall discrimination; Logistic Regression remained near chance by AUROC.</figcaption>
+    </figure>
+    <div class="callout evidence"><strong>Warehouse support check:</strong> the five-feature March frame contains 71,777 eligible pages, a 23.4% forward-decline proxy rate, and a client-grouped Logistic Regression AUROC of 0.590. This directional result is reported separately because its future-window label is not the same as the starter proxy.</div>
+  </section>
+
+  <section>
+    <h2>5. Limitations &amp; honest framing</h2>
+    <ul>
+      <li>The starter release is a trailing-90-day snapshot, not an intervention study; its proxy is not an independent future truth label.</li>
+      <li>The warehouse outcome is stronger temporally, but a ten-day impression decline can reflect seasonality, search demand, SERP changes, or measurement noise.</li>
+      <li>CTR depends on rank and result-page layout; staleness does not imply poor quality.</li>
+      <li>Precision@20 is capacity-aligned but based on only twenty cases and should not be read alone.</li>
+      <li>Grouped validation tests unseen clients, but the primary starter result is not a future-month test.</li>
+      <li>No result proves that refreshing, rewriting, pruning, merging, or changing metadata causes recovery.</li>
+    </ul>
+    <div class="callout caution"><strong>Claim boundary:</strong> the evidence is observational and directional. It can support human triage; it cannot establish Google's ranking logic, a causal refresh effect, or a guaranteed traffic gain.</div>
+  </section>
+
+  <section>
+    <h2>6. Ranked recommendations</h2>
+    <ol class="actions">
+      <li><strong>Review title/snippet — 9,759 pages.</strong> Reason code <code>LOW_CTR_VISIBLE</code>. Confirm query intent, ranking position, SERP features, and whether the snippet accurately represents the page before changing metadata.</li>
+      <li><strong>Review refresh — 6 pages.</strong> Reason code <code>STALE_HIGH_VOLUME</code>. Check factual freshness, traffic history, cannibalization, and recent site changes before editing.</li>
+      <li><strong>Monitor — 2,264 pages.</strong> Reason code <code>VISIBLE_MONITOR</code>. Preserve the page and watch a future window rather than creating churn from weak evidence.</li>
+      <li><strong>Hold — 17,971 pages.</strong> Reason code <code>INSUFFICIENT_SIGNAL</code>. Gather more data or leave unchanged; a complete queue does not require forcing every page into an intervention.</li>
+    </ol>
+    <figure>
+      <img src="assets/w07_action_mix.png" alt="Bar chart showing counts of hold, review title and snippet, monitor, and review refresh recommendations.">
+      <figcaption>Most pages are held rather than forced into an editorial action.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/w07_staleness_by_action.png" alt="Box plot showing days since last update across the four recommendation groups.">
+      <figcaption>Staleness helps trigger review, but it is not treated as proof of content decay.</figcaption>
+    </figure>
+    <p><strong>No-go automation:</strong> do not automatically publish, rewrite, delete, noindex, redirect, canonicalize, merge pages, alter production metadata or schema, or promise traffic improvement.</p>
+  </section>
+
+  <section>
+    <h2>7. Reproducibility</h2>
+    <p>Random seed 42 is fixed where applicable. The repo contains the starter release, requirements, executed weekly notebooks, public-safe metric receipts, the action playbook, and this capstone companion.</p>
+    <ul>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship">Public repository</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w03_data_contract.ipynb">Warehouse data contract and leakage check</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w04_baseline_score.ipynb">Transparent baseline</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w05_model.ipynb">Model comparison</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w06_validation_audit.ipynb">Validation and failure audit</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/w07_action_playbook.ipynb">Ranked action playbook</a></li>
+      <li><a href="https://github.com/aabdullahhtar-create/flyrank-ML-internship/blob/main/work/notebooks/capstone.ipynb">Capstone reproducibility companion</a></li>
+    </ul>
+  </section>
+
+  <footer>
+    <h2>8. Acknowledgments &amp; data credit</h2>
+    <p><strong><a href="https://flyrank.ai/" target="_blank" rel="noreferrer">Built on the FlyRank ML Internship dataset</a>.</strong> Thanks to FlyRank for the pseudonymized internship data and learning framework.</p>
+    <p class="meta">Internship research artifact · Public-safe · Not a production recommendation system</p>
+  </footer>
+</main>
+</body>
+</html>
